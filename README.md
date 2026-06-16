@@ -49,7 +49,29 @@ bag_color - yellow, green, white, red, blue, black
 All features against final_test (scatter plot & box plot)
 
 #Correlation Analysis
+Pearson
+number_of_siblings   -0.363767
+attendance_rate       0.340307
+sleep_hours_daily     0.327213
+tuition               0.269565
+direct_admission      0.240523
+n_female             -0.171978
+n_male               -0.149152
+hours_per_week       -0.148254
+is_male               0.011779
+age                   0.005179
 
+Spearman
+number_of_siblings   -0.369936
+sleep_hours_daily     0.287414
+direct_admission      0.267925
+tuition               0.267439
+hours_per_week       -0.180432
+attendance_rate       0.162740
+n_female             -0.161848
+n_male               -0.152408
+is_male               0.012640
+age                   0.004166
 
 #Data Cleaning 
 CCA - Sports, Arts, Club, ARTS, SPORTS, CLUB, NONE
@@ -72,6 +94,11 @@ n_male & n_female
 #Feature Engineering 
 sleep_time & wake_time
 1. Transform to sleep_hours_daily
+
+
+TODO
+1. Better Understand Pearson vs Spearman correlation
+2. Review attendance_rate & sleep_hours_daily (consider removing 1 correlated feature?)
 
 Data Splitting
 Feature Scaling 
