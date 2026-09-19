@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -20,19 +20,22 @@ class ModelTraining:
 
     Attributes:
         config (Dict[str, Any]): Configuration dictionary for model training.
-        preprocessor (ColumnTransformer): Preprocessor for data transformation of numerical, nominal, and passthrough features.
+        preprocessor_factory (Callable[[], ColumnTransformer]): Builds a fresh,
+            unfitted preprocessor. Called once per model pipeline so every
+            pipeline owns its own independent preprocessor instance.
     """
 
-    def __init__(self, config: Dict[str, Any], preprocessor: ColumnTransformer):
+    def __init__(self, config: Dict[str, Any], preprocessor_factory: Callable[[], ColumnTransformer]):
         """
-        Initializes the ModelTraining class with the given configuration and preprocessor.
+        Initializes the ModelTraining class with the given configuration and preprocessor factory.
 
         Args:
             config (Dict[str, Any]): Configuration dictionary for model training.
-            preprocessor (ColumnTransformer): Preprocessor for data transformation of numerical, nominal, and passthrough features.
+            preprocessor_factory (Callable[[], ColumnTransformer]): Callable that
+                returns a new, unfitted ColumnTransformer each time it's called.
         """
         self.config = config
-        self.preprocessor = preprocessor
+        self.preprocessor_factory = preprocessor_factory
 
     def split_data(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
         """
@@ -76,17 +79,17 @@ class ModelTraining:
 
         logger.info("Starting baseline model training and evaluation.")
         models = {
-            'Dummy (median)': DummyRegressor(strategy='median'),
-            'Linear Regression': LinearRegression(),
-            'Ridge Regression': Ridge(),
-            'Lasso Regression': Lasso()
+            'dummy_median': DummyRegressor(strategy='median'),
+            'linear_regression': LinearRegression(),
+            'ridge': Ridge(),
+            'lasso': Lasso(),
         }
         pipelines = {}
         metrics = {}
 
         for model_name, model in models.items():
             logger.info("Training %s.", model_name)
-            pipeline = Pipeline(steps=[('preprocessor', self.preprocessor), ('regressor', model)])
+            pipeline = Pipeline(steps=[('preprocessor', self.preprocessor_factory()), ('regressor', model)])
             pipeline.fit(X_train, y_train)
             pipelines[model_name] = pipeline
 
@@ -134,7 +137,10 @@ class ModelTraining:
         for model_name, model in models.items():
             logger.info("Training %s with hyperparameter tuning.", model_name)
 
-            pipeline = Pipeline(steps=[('preprocessor', self.preprocessor), ('regressor', model)])
+            if model_name not in param_grids:
+                raise ValueError(f"Config 'param_grids' is missing an entry for model '{model_name}'.")
+
+            pipeline = Pipeline(steps=[('preprocessor', self.preprocessor_factory()), ('regressor', model)])
             param_grid = param_grids[model_name]
 
             grid_search = GridSearchCV(estimator=pipeline, param_grid=param_grid, cv=cv, scoring=scoring, n_jobs=-1)
@@ -252,4 +258,9 @@ class ModelTraining:
             'R2 Score': r2_score(y_val, y_pred)
         }
         logger.info("Evaluation metrics for %s: %s", model_name, metrics)
+        if metrics['R2 Score'] < 0:
+            logger.warning(
+                "%s has a negative R2 Score (%.4f), i.e. it performs worse than "
+                "predicting the mean.", model_name, metrics['R2 Score'],
+            )
         return metrics
