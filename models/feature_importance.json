@@ -1,0 +1,13 @@
+{
+  "num__number_of_siblings": 0.33099047578284124,
+  "num__hours_per_week": 0.2037752636853154,
+  "num__attendance_rate": 0.16669127527218391,
+  "pass__direct_admission": 0.11698192102407397,
+  "cat__CCA_None": 0.0649917107491247,
+  "pass__tuition": 0.0537976152735247,
+  "cat__learning_style_Visual": 0.027368375167032326,
+  "cat__learning_style_Auditory": 0.02702675623719538,
+  "cat__CCA_Clubs": 0.0033200872417921776,
+  "cat__CCA_Sports": 0.002921339224169856,
+  "cat__CCA_Arts": 0.0021351803427464094
+}

@@ -1,0 +1,7 @@
+{
+  "model_name": "random_forest_tuned",
+  "hyperparameters": {
+    "regressor__max_depth": 10,
+    "regressor__n_estimators": 300
+  }
+}

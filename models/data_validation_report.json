@@ -1,0 +1,11 @@
+{
+  "n_rows": 15900,
+  "n_columns": 18,
+  "missing_values_per_column": {
+    "CCA": 3829,
+    "final_test": 495,
+    "attendance_rate": 778
+  },
+  "n_duplicate_rows": 0,
+  "n_invalid_age": 451
+}
