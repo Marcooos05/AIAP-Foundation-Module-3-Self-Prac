@@ -3,9 +3,20 @@ target_column: "final_test"
 val_test_size: 0.2
 validation_size: 0.5
 random_state: 42
-param_grid:
-  regressor__alpha: [0.1, 1.0, 10.0, 100.0, 1000.0]
-  regressor__fit_intercept: [True, False]
+param_grids:
+  ridge_tuned:
+    regressor__alpha: [0.1, 1.0, 10.0, 100.0, 1000.0]
+    regressor__fit_intercept: [True, False]
+  lasso_tuned:
+    regressor__alpha: [0.1, 1.0, 10.0, 100.0, 1000.0]
+    regressor__fit_intercept: [True, False]
+  random_forest_tuned:
+    regressor__n_estimators: [100, 300]
+    regressor__max_depth: [null, 10, 20]
+  gradient_boosting_tuned:
+    regressor__n_estimators: [100, 300]
+    regressor__learning_rate: [0.05, 0.1]
+    regressor__max_depth: [2, 3]
 cv: 5
 scoring: r2
 numeric_features:
@@ -15,7 +26,6 @@ numeric_features:
 nominal_features:
   - learning_style
   - CCA
-ordinal_features: []
 passthrough_features:
   - direct_admission
   - tuition
