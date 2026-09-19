@@ -15,8 +15,9 @@ class DataPreparation:
 
     Attributes:
         config (Dict[str, Any]): Configuration dictionary for data preparation.
-        preprocessor (ColumnTransformer): Preprocessor for data transformation of numerical, nominal, and passthrough features.
     """
+
+    REQUIRED_RAW_COLUMNS = ('final_test', 'CCA', 'attendance_rate', 'tuition', 'direct_admission')
 
     def __init__(self, config: Dict[str, Any]):
         """
@@ -26,8 +27,6 @@ class DataPreparation:
             config (Dict[str, Any]): Configuration dictionary for data preparation.
         """
         self.config = config
-
-        self.preprocessor = self._create_preprocessor()
 
     def generate_validation_report(self, df: pd.DataFrame) -> Dict[str, Any]:
         """
@@ -60,7 +59,15 @@ class DataPreparation:
 
         Args:
             df (pd.DataFrame): Input DataFrame containing raw data.
+        Raises:
+            ValueError: If the DataFrame is empty or is missing a required raw column.
         """
+        if df.empty:
+            raise ValueError("Cannot clean an empty DataFrame.")
+
+        missing_columns = [col for col in self.REQUIRED_RAW_COLUMNS if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Data is missing required raw column(s): {missing_columns}.")
 
         logger.info("Starting data cleaning process. Rows before cleaning: %d", len(df))
 
@@ -81,6 +88,12 @@ class DataPreparation:
             "'attendance_rate' value(s) with mean %.4f.",
             n_missing_cca, n_missing_attendance, attendance_mean,
         )
+        if len(df) and n_missing_attendance / len(df) > 0.1:
+            logger.warning(
+                "More than 10%% of 'attendance_rate' values were missing and mean-imputed "
+                "(%d/%d rows); this may bias the feature.",
+                n_missing_attendance, len(df),
+            )
 
         df.replace({'CCA': {'ARTS': 'Arts', 'SPORTS': 'Sports', 'NONE': 'None', 'CLUBS': 'Clubs'}}, inplace=True)
         df.replace({'tuition': {'Y': 'Yes', 'N': 'No'}}, inplace=True)
@@ -98,9 +111,11 @@ class DataPreparation:
         logger.info("Data cleaning process completed. Rows after cleaning: %d", len(df))
         return df
 
-    def _create_preprocessor(self) -> ColumnTransformer:
+    def create_preprocessor(self) -> ColumnTransformer:
         """
-        Creates a preprocessor for data transformation of numerical, nominal, and passthrough features.
+        Builds a new preprocessor for data transformation of numerical, nominal, and
+        passthrough features. Called once per model pipeline so each pipeline owns
+        an independent, unfitted preprocessor instance.
         Returns:
             ColumnTransformer: A preprocessor for data transformation.
         """
