@@ -1,105 +1,267 @@
-df.info() - Understanding the description of the dataset
-Attribute		Description & Data Type     Action
-index       index for entry - Nominal       Remove index
-student_id		Unique ID for each student - Nominal    Remove id
-number_of_siblings	Number of siblings - Ratio      Keep/Remove
-direct_admission	Mode of entering the school - Nominal       Keep boolean encoding/Remove
-CCA			Enrolled CCA - Nominal      Keep categorical encoding/Remove
-learning_style		Primary learning style - Nominal        Keep categorical encoding/Remove
-tuition			Indication of whether the student has a tuition - Nominal       Keep boolean encoding/Remove
-final_test		Student's O-level mathematics examination score - Ratio     Predicted Value
-n_male			Number of male classmates - Ratio       Keep/Remove
-n_female		Number of female classmates - Ratio     Keep/Remove
-gender			Gender type - Nominal       Keep boolean encoding/Remove
-age			Age of the student - Ratio      Keep/Remove
-hours_per_week		Number of hours student studies per week - Ratio    Keep/Remove
-attendance_rate		Attendance rate of the student (%) - Ratio      Keep/Remove
-sleep_time		Daily sleeping time (hour:minutes) - Interval(?)    Feature Engineering to sleep_hours_daily
-wake_time		Daily waking up time (hour:minutes) - Interval(?)   Feature Engineering to sleep_hours_daily
-mode_of_transport	Mode of transport to school - Nominal   Keep categorical encoding/Remove
-bag_color		Colours of student's bag - Nominal      Remove
+# Student Score Regression Pipeline
 
+A configurable, end-to-end machine learning pipeline that predicts a student's
+O-level mathematics examination score (`final_test`) from demographic,
+academic, and lifestyle attributes. It loads raw student records, validates
+and cleans them, trains a set of baseline and hyperparameter-tuned regression
+models, and automatically selects and reports the best performer on a
+held-out test set.
 
-df.duplicated().sum()
-No duplicates after checking - no need to remove duplicates
+The pipeline is driven entirely by configuration (`src/config.yaml`), so
+features, model hyperparameters, and data splits can be changed without
+editing code.
 
-df.isnull().sum()
-CCA                   3829
-final_test             495
-attendance_rate        778
-1. Remove all null final_test since that is the predicted value, without the final_test score the entry is not useful. It could have been that the student did not take the test hence no final_test score, giving a synthetic score like mean or median will influence the model drastically, hence the decision to remove the entries.
-2. CCA replace the null with 'NONE' for students with 'NaN' CCA. We can make the assumption that a null CCA entry would suggest that the student is not part of any CCA, hence we will make that another category.
-3. attendance_rate null values are not explainable via the dataset. Propose to use the mean or median value to fill the null attendance_rate entries
+---
 
-df.describe().T
-feature     count	mean	std	min	25%	50%	75%	max
-age	15900.0	15.213459	1.758941	-5.0	15.00	15.0	16.00	16.0
-1. min age was observed to be -5, which is not a possible age value. Total of 451 entries with age less than 15. Transform the 5 and -5 ages to 15, then 6 and -6 to 16, under the assumption that the age was collected mistakenly. Since most of the erroneous data were 6,5,4,-5,-6 and the expected age is between the range of 14 and 16, we can make a reasonable assumption to clean and transform the data accordingly to match the reasonable age instead.
+## Prerequisites and Installation
 
-Univariate Feature Analysis
-direct_admission - Yes & No
-CCA - Sports, Arts, Club, ARTS, SPORTS, CLUB, NONE
-learning_style - Visual & Auditory
-gender - Male & Female
-tuition - Yes, No, Y, N
-mode_of_transport - private transport, public transport, walk
-bag_color - yellow, green, white, red, blue, black 
+**Prerequisites**
 
-#Bivariate Feature Analysis
-All features against final_test (scatter plot & box plot)
+- Python 3.11 (see `.python-version`)
+- The dependencies in `requirements.txt`: numpy, pandas, scikit-learn, scipy, PyYAML
+- For development/testing: `requirements-dev.txt` additionally installs pytest, matplotlib, and seaborn (the latter two for `eda.ipynb` only)
 
-#Correlation Analysis
-Pearson
-number_of_siblings   -0.363767
-attendance_rate       0.340307
-sleep_hours_daily     0.327213
-tuition               0.269565
-direct_admission      0.240523
-n_female             -0.171978
-n_male               -0.149152
-hours_per_week       -0.148254
-is_male               0.011779
-age                   0.005179
+**Installation**
 
-Spearman
-number_of_siblings   -0.369936
-sleep_hours_daily     0.287414
-direct_admission      0.267925
-tuition               0.267439
-hours_per_week       -0.180432
-attendance_rate       0.162740
-n_female             -0.161848
-n_male               -0.152408
-is_male               0.012640
-age                   0.004166
+```bash
+cd AIAP_Mod3_Self-Prac
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 
-#Data Cleaning 
-CCA - Sports, Arts, Club, ARTS, SPORTS, CLUB, NONE
-1. Transform to use standardized string, Pascal Case formatting - Sports, Arts, Club, None
-2. Consideration - CCA vs No CCA instead of categorical encoding 
-tuition - Yes, No, Y, N
-1. Transform to use standardized string, Pascal Case formatting - Yes & No
-gender - Male & Female 
-1. Remove due to poor relationship against final_test
-mode_of_transport - private transport, public transport, walk
-1. Remove due to poor relationship against final_test
-bag_color - yellow, green, white, red, blue, black 
-1. Remove due to poor relationship against final_test
+# Runtime only
+pip install -r requirements.txt
 
-age
-1. Remove due to poor relationship against final_test 
-n_male & n_female
-1. Highly correlated - Remove due to poor relationship against final_test 
+# Runtime + dev/test tooling
+pip install -r requirements-dev.txt
+```
 
-#Feature Engineering 
-sleep_time & wake_time
-1. Transform to sleep_hours_daily
+---
 
+## Instructions for Executing the Pipeline
 
-TODO
-1. Better Understand Pearson vs Spearman correlation
-2. Review attendance_rate & sleep_hours_daily (consider removing 1 correlated feature?)
+Run the full pipeline from the `AIAP_Mod3_Self-Prac/` directory:
 
-Data Splitting
-Feature Scaling 
-Feature Encoding 
+```bash
+python main.py
+```
+
+`main.py` loads and validates `src/config.yaml`, reads the dataset, checks
+that every configured column is present, then runs validation reporting →
+cleaning → splitting → baseline training → tuning → model selection → refit
+→ final test evaluation → explainability. Progress, timings, and evaluation
+metrics are logged to the console, ending with the selected best model and
+its test-set performance.
+
+**Modifying parameters** — edit `src/config.yaml` (no code changes needed):
+
+| Key | Purpose |
+| --- | --- |
+| `file_path` | Path to the input CSV |
+| `target_column` | Column to predict (`final_test`) |
+| `val_test_size`, `validation_size` | Train / validation / test split ratios |
+| `random_state` | Seed for reproducible splits |
+| `param_grids`, `cv`, `scoring` | Per-model hyperparameter grids, CV folds, and scoring for tuning |
+| `numeric_features`, `nominal_features`, `passthrough_features` | Feature roles in preprocessing |
+
+**Outputs:**
+
+| Path | Contents |
+| --- | --- |
+| `models/best_pipeline.joblib` | The final fitted model (preprocessor + regressor), refit on train+validation data |
+| `reports/data_validation_report.json` | Pre-cleaning data quality stats (row/column counts, missing values, duplicates, invalid ages) |
+| `reports/final_metrics.json` | Test-set MAE / MSE / RMSE / R² for the final model |
+| `reports/selected_hyperparameters.json` | Chosen model's name and tuned hyperparameters |
+| `reports/feature_importance.json` | Feature importances (tree models) or coefficients (linear models) |
+
+---
+
+## Running Tests
+
+```bash
+pytest
+```
+
+Covers the deterministic data-cleaning and config-validation helpers
+(`tests/test_data_preparation.py`, `tests/test_config_validation.py`), plus a
+miniature end-to-end run of the full pipeline on synthetic data
+(`tests/test_pipeline_integration.py`).
+
+---
+
+## Pipeline Flow
+
+```
+config.yaml + CSV
+       │
+       ▼
+┌───────────────────┐
+│ Load & validate   │  yaml.safe_load, validate_config, column-presence check
+│ config + data     │
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│ Validation report │  DataPreparation.generate_validation_report
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│ Clean data        │  DataPreparation.clean_data
+│                    │  (dedup, drop missing target, impute, normalise, drop columns)
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│ Split data        │  train / validation / test
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│ Preprocess         │  independent ColumnTransformer per model Pipeline
+│ (scale / encode)   │  (fit on train, applied per fold)
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│ Train baselines   │  Dummy (median), Linear, Ridge, Lasso
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│ Tune models        │  GridSearchCV: Ridge, Lasso, Random Forest, Gradient Boosting
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│ Select best        │  highest validation R²
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│ Refit + evaluate   │  refit on train+val, evaluate on held-out test set
+└─────────┬─────────┘
+          ▼
+┌───────────────────┐
+│ Explain & persist  │  feature importance/coefficients, save model + reports
+└───────────────────┘
+```
+
+**Step summary**
+
+1. **Load & validate** (`main.py`) — read `config.yaml`, validate its schema, load the CSV, and check every configured feature/target column exists.
+2. **Validation report** (`data_preparation.py`) — compute row/column counts, missing-value counts, duplicate count, and invalid-age count on the raw data, before any cleaning.
+3. **Clean** (`data_preparation.py`) — drop duplicates; drop rows missing the target `final_test`; fill missing `CCA` with `'None'` and missing `attendance_rate` with the column mean; normalise inconsistent `CCA`/`tuition` labels; map `direct_admission`/`tuition` to binary 0/1; drop columns with no meaningful relationship to the target or that are redundant (`index`, `student_id`, `gender`, `bag_color`, `mode_of_transport`, `age`, `n_male`, `n_female`, `sleep_time`, `wake_time`).
+4. **Split** (`model_training.py`) — partition into train, validation, and test sets via two `train_test_split` calls.
+5. **Preprocess** — each model `Pipeline` gets its own `ColumnTransformer` instance (scales numeric features, one-hot encodes nominal features, passes through binary features), fit only on that pipeline's training data.
+6. **Train baselines** — Dummy (median), Linear, Ridge, and Lasso regression, scored on the validation set.
+7. **Tune** — `GridSearchCV` over each model's grid in `param_grids` (Ridge, Lasso, Random Forest, Gradient Boosting), scored on R² with `cv`-fold cross-validation.
+8. **Select** — pick the model with the highest validation R².
+9. **Refit & evaluate** — refit the selected model on combined train+validation data, then report MAE / MSE / RMSE / R² on the untouched test set.
+10. **Explain & persist** — extract feature importances/coefficients, then save the model and all reports to disk.
+
+---
+
+## Key Findings from EDA
+
+Detailed analysis lives in `eda.ipynb`; the highlights that shaped the pipeline:
+
+- **15,900 student records**, with `final_test` (O-level math score) as the target.
+- **No duplicate rows** in the raw data.
+- **Missing values** — `CCA` (3,829), `final_test` (495), `attendance_rate` (778). Rows missing the target are dropped (a synthetic score would bias the model); missing `CCA` is treated as its own `'None'` category; missing `attendance_rate` is mean-imputed.
+- **Invalid `age` values** — minimum observed age was -5, with 451 entries outside the plausible 14–16 range, most likely sign/typo errors. `age` was ultimately dropped rather than corrected, since it showed ~0 correlation with `final_test` even after cleaning.
+- **Inconsistent category labels** — `CCA` contained mixed casing (`SPORTS`, `Sports`, `ARTS`, etc.) and `tuition` contained both `Yes/No` and `Y/N` → both normalised to a single consistent form.
+- **Weak/redundant features dropped** — `gender`, `bag_color`, `mode_of_transport`, and `age` showed poor relationships with `final_test`; `n_male`/`n_female` were highly correlated with each other and weakly related to the target; `sleep_hours_daily` (engineered from `sleep_time`/`wake_time`) was dropped in favour of the more strongly correlated `attendance_rate` due to collinearity.
+- **Strongest correlates of `final_test`** — `number_of_siblings` (negative), `attendance_rate`, `tuition`, and `direct_admission` (all positive).
+
+---
+
+## Feature Handling
+
+Raw fields are cleaned in `clean_data`, then transformed by a
+`ColumnTransformer` before modelling (roles configured in `config.yaml`).
+
+| Feature | Type | Cleaning | Transform |
+| --- | --- | --- | --- |
+| `number_of_siblings` | Numeric | Used as-is | `StandardScaler` |
+| `attendance_rate` | Numeric | Missing values filled with column mean | `StandardScaler` |
+| `hours_per_week` | Numeric | Used as-is | `StandardScaler` |
+| `learning_style` | Nominal | Used as-is | `OneHotEncoder` |
+| `CCA` | Nominal | Missing → `'None'`; casing normalised (`SPORTS`→`Sports`, etc.) | `OneHotEncoder` |
+| `direct_admission` | Passthrough | Mapped `Yes`/`No` → `1`/`0` | Passthrough |
+| `tuition` | Passthrough | Normalised `Y`/`N` → `Yes`/`No`, then mapped → `1`/`0` | Passthrough |
+
+**Dropped columns:** `index`, `student_id` (identifiers); `gender`,
+`bag_color`, `mode_of_transport`, `age`, `n_male`, `n_female`, `sleep_time`,
+`wake_time` (weak relationship with the target or redundant/collinear with a
+stronger feature — see EDA findings above).
+
+---
+
+## Model Choices
+
+| Model | Why included |
+| --- | --- |
+| **Dummy (median)** | Naive baseline — predicts the median training score regardless of input; anything worse than this signals a broken pipeline. |
+| **Linear Regression** | Simplest real baseline; establishes a reference R² with no regularisation. |
+| **Ridge (L2)** | Penalises large coefficients to curb overfitting given the one-hot encoded feature space. |
+| **Lasso (L1)** | Adds sparsity, effectively performing feature selection by driving weak coefficients to zero. |
+| **Random Forest** | Captures non-linear relationships and feature interactions the linear models can't. |
+| **Gradient Boosting** | Sequentially corrects prior errors; typically the strongest performer among tree ensembles on tabular data of this size. |
+
+Ridge, Lasso, Random Forest, and Gradient Boosting are additionally **tuned**
+with `GridSearchCV` over the grids defined per-model in `config.yaml`
+(`param_grids`), using `cv`-fold cross-validation scored on R².
+
+---
+
+## Model Evaluation
+
+Each model is scored on the validation set; the best is refit on
+train+validation and re-evaluated on the untouched test set. Metrics
+computed in `_evaluate_model`:
+
+| Metric | Meaning | Why it matters here |
+| --- | --- | --- |
+| **MAE** | Mean Absolute Error | Average score-point error, robust to outliers — intuitive for exam scores. |
+| **MSE** | Mean Squared Error | Penalises large errors more heavily. |
+| **RMSE** | Root Mean Squared Error | Same units as the score; interpretable error magnitude. |
+| **R²** | Coefficient of determination | Share of score variance explained; used as the **selection criterion** and tuning score. |
+
+**Selection:** `main.py` picks the model with the highest validation **R²**,
+refits it on train+validation data, then reports its full metric set on the
+test set so the headline performance reflects unseen data.
+
+---
+
+## Considerations for Deployment
+
+- **Reproducible inference** — the fitted `Pipeline` bundles preprocessing and the regressor, so the same transformations applied in training run at inference. The chosen pipeline is persisted via `joblib.dump` (`models/best_pipeline.joblib`) rather than retraining on each call.
+- **Schema & input validation** — `main.py` verifies configured columns exist in the input data before training; `OneHotEncoder(handle_unknown='ignore')` gives graceful handling of unseen `CCA`/`learning_style` categories at inference, but upstream validation of incoming records is still advisable.
+- **Data and concept drift** — student behaviour and academic standards shift over cohorts; plan periodic retraining and monitor live error (MAE/RMSE) against the reported test-set baseline.
+- **Independent preprocessors** — each model pipeline builds and fits its own `ColumnTransformer` instance rather than sharing one, avoiding any risk of state leaking between models during experimentation.
+- **Model ceiling** — if accuracy is insufficient for production, additional feature engineering (e.g. revisiting the dropped `sleep_hours_daily`/`age` features) or ensembling is a natural next step and slots into the same pipeline structure.
+
+---
+
+## Project Structure
+
+```
+AIAP_Mod3_Self-Prac/
+├── main.py                    # Pipeline entry point
+├── eda.ipynb                  # Exploratory data analysis
+├── requirements.txt           # Runtime dependencies
+├── requirements-dev.txt       # + dev/test dependencies (pytest, matplotlib, seaborn)
+├── pytest.ini                 # Test discovery config
+├── .python-version            # Pinned Python version
+├── data/
+│   └── regression_bonus_practice_data.csv
+├── models/
+│   └── best_pipeline.joblib   # Final fitted model (generated by `python main.py`)
+├── reports/                   # Validation report, metrics, hyperparameters, feature importance
+├── tests/
+│   ├── test_data_preparation.py
+│   ├── test_config_validation.py
+│   └── test_pipeline_integration.py
+└── src/
+    ├── config.yaml             # Features, model, and split configuration
+    ├── config_validation.py    # Config schema/range validation
+    ├── data_preparation.py     # Validation reporting, cleaning, preprocessor factory
+    └── model_training.py       # Split, train, tune, evaluate, explain
+```
+
+## Future Improvements
+
+If this project continues to grow, natural next steps include a
+`Dockerfile` or `pyproject.toml` packaging for more robust environment
+reproduction, and CI to run `pytest` automatically on each change.
